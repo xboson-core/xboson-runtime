@@ -2,8 +2,10 @@
 
 - Getting started
   - [What is xBoson ?](./getting-started/what-is.md)
+  - [xBoson in the AI Era](./getting-started/ai-era.md)
   - [Installation](./getting-started/installation.md)
   - [Architecture](./getting-started/architecture.md)
+  - [Authorization](./getting-started/authorization.md)
 
 - User Guides
   - [UI-IDE](./user-guides/ui-ide.md)
