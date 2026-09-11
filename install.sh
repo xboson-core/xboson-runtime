@@ -29,6 +29,7 @@ check_compose() {
     docker compose version
   else
     echo "ERROR: Docker Compose installation failed."
+    echo "Please install Docker Compose yourself, then try again."
     exit 1
   fi
 }
@@ -58,7 +59,31 @@ install_type_choose() {
 }
 
 
+input_val() {
+  local valname="$1"
+  local default="$2"
+  local message="$3"
+  local value
+
+  read -r -p "$message [$default]: " value
+  if [[ -z "$value" ]]; then
+    value="$default"
+  fi
+  printf -v "$valname" '%s' "$value"
+}
+
+
 make_env() {
+  echo
+  echo "Please enter the information"
+  echo "Included with authorization request emails"
+  echo "You can ignore this; just press Enter."
+  echo "-------------------------------------------"
+  input_val LICENSE_APP_NAME "Evaluate" "Application name"
+  input_val LICENSE_COMPANY "unknow" "Company"
+  input_val LICENSE_DNS "$(hostname -f)" "DNS"
+  input_val LICENSE_EMAIL "dev@example.com" "Email"
+
   MYSQL_PASSWORD=`openssl rand -base64 20`
   REDIS_PASS=`openssl rand -base64 20`
   MONGO_USERNAME=root
@@ -69,14 +94,33 @@ make_env() {
   ARTEMIS_USER=root
   ARTEMIS_PASSWORD=`openssl rand -base64 20`
   mongoURL=mongodb://mongo-x
+  URL_PREFIX=/xboson
+
+  UI_RENDER_HOST=ui-render-x
+  MYSQL_HOST="mysql-x"
+  REDIS_HOST="redis-x"
+  MONGO_HOST="mongo-x"
+
   # if [[ "$MONGO_USERNAME:$MONGO_PASSWORD" != ":" ]]; then
   #   mongoURL=mongodb://$MONGO_USERNAME:$MONGO_PASSWORD@mongo-x
   # fi
+
 cat > .env <<EOF
 MYSQL_PASSWORD=$MYSQL_PASSWORD
 SESSION_KEY=$SESSION_KEY
 REDIS_PASS=$REDIS_PASS
 mongoURL=$mongoURL
+URL_PREFIX=$URL_PREFIX
+
+LICENSE_APP_NAME=$LICENSE_APP_NAME
+LICENSE_COMPANY=$LICENSE_COMPANY
+LICENSE_DNS=$LICENSE_DNS
+LICENSE_EMAIL=$LICENSE_EMAIL
+
+UI_RENDER_HOST=$UI_RENDER_HOST
+MYSQL_HOST=$MYSQL_HOST
+REDIS_HOST=$REDIS_HOST
+MONGO_HOST=$MONGO_HOST
 
 # not used
 MONGO_USERNAME=$MONGO_USERNAME
@@ -90,63 +134,93 @@ EOF
 
 
 make_compose() {
-  cat > ./docker-compose.yml <<'EOF'
+  local ipf="" # local test
+  # local ipf="xbosoncore/" # on dockerhub
+  cat > ./docker-compose.yml <<EOF
 networks:
   xboson-net:
     name: xboson-net
 
 services:
   mysql:
-    image: xbosoncore/xboson-mysql:latest
-    container_name: mysql-x
+    image: ${ipf}xboson-mysql:latest
+    container_name: \${MYSQL_HOST}
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_PASSWORD}"
+      MYSQL_ROOT_PASSWORD: "\${MYSQL_PASSWORD}"
     networks:
       - xboson-net
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_PASSWORD}"]
+      test:
+        - "CMD-SHELL"
+        - >
+          test -f /var/lib/mysql/xboson.mysql-init-complete &&
+          mysql -uroot -p"\$\${MYSQL_ROOT_PASSWORD}" 
+          -e "SELECT 1 FROM mysql.user LIMIT 1" >/dev/null 2>&1
       interval: 5s
       timeout: 5s
       retries: 30
       start_period: 10s
 
   redis:
-    image: xbosoncore/xboson-redis:latest
-    container_name: redis-x
+    image: ${ipf}xboson-redis:latest
+    container_name: \${REDIS_HOST}
     restart: always
     environment:
-      REDIS_PASS: "${REDIS_PASS}"
+      REDIS_PASS: "\${REDIS_PASS}"
     networks:
       - xboson-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "\${REDIS_PASS}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
   mongodb:
-    image: xbosoncore/xboson-mongo:latest
-    container_name: mongo-x
+    image: ${ipf}xboson-mongo:latest
+    container_name: \${MONGO_HOST}
     restart: always
     # environment:
-    #   MONGO_INITDB_ROOT_USERNAME: "${MONGO_USERNAME}"
-    #   MONGO_INITDB_ROOT_PASSWORD: "${MONGO_PASSWORD}"
+    #   MONGO_INITDB_ROOT_USERNAME: "\${MONGO_USERNAME}"
+    #   MONGO_INITDB_ROOT_PASSWORD: "\${MONGO_PASSWORD}"
     networks:
       - xboson-net
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "mongo --quiet --eval 'db.adminCommand(\"ping\").ok' | grep -q 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   ui-render:
-    image: xbosoncore/xboson-ui-ext:latest
-    container_name: ui-render-x
+    image: ${ipf}xboson-ui-ext:latest
+    container_name: ${UI_RENDER_HOST}
     restart: always
     networks:
       - xboson-net
 
   xboson:
-    image: xbosoncore/xboson-runtime:latest
+    image: ${ipf}xboson-runtime:latest
     container_name: xboson-rt
     restart: always
     environment:
-      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"
-      REDIS_PASSWORD: "${REDIS_PASS}"
-      SESSION_KEY: "${SESSION_KEY}"
-      # MONGO_USERNAME: "${MONGO_USERNAME}"
-      # MONGO_PASSWORD: "${MONGO_PASSWORD}"
+      MYSQL_PASSWORD: "\${MYSQL_PASSWORD}"
+      REDIS_PASSWORD: "\${REDIS_PASS}"
+      SESSION_KEY: "\${SESSION_KEY}"
+      LICENSE_APP_NAME: "\${LICENSE_APP_NAME}"
+      LICENSE_COMPANY: "\${LICENSE_COMPANY}"
+      LICENSE_DNS: "\${LICENSE_DNS}"
+      LICENSE_EMAIL: "\${LICENSE_EMAIL}"
+      URL_PREFIX: "\${URL_PREFIX}"
+      UI_RENDER_HOST: "\${UI_RENDER_HOST}"
+      MYSQL_HOST: "\${MYSQL_HOST}"
+      REDIS_HOST: "\${REDIS_HOST}"
+      MONGO_HOST: "\${MONGO_HOST}"
+      # MONGO_USERNAME: "\${MONGO_USERNAME}"
+      # MONGO_PASSWORD: "\${MONGO_PASSWORD}"
     networks:
       - xboson-net
     ports:
@@ -161,17 +235,17 @@ services:
 EOF
 
 if [[ $INSTALL_MODE == "full" ]]; then
-  cat >> ./docker-compose.yml <<'EOF'
+  cat >> ./docker-compose.yml <<EOF
 
   artemis:
-    image: xbosoncore/xboson-artemis:latest
+    image: ${ipf}xboson-artemis:latest
     container_name: mqtt-x
     restart: always
     environment:
-      # ARTEMIS_USER: "${ARTEMIS_USER}"
-      # ARTEMIS_PASSWORD: "${ARTEMIS_PASSWORD}"
+      # ARTEMIS_USER: "\${ARTEMIS_USER}"
+      # ARTEMIS_PASSWORD: "\${ARTEMIS_PASSWORD}"
       ANONYMOUS_LOGIN: "true"
-      mongoURL: "${mongoURL}"
+      mongoURL: "\${mongoURL}"
     networks:
       - xboson-net
 
@@ -201,7 +275,7 @@ if [[ $INSTALL_MODE == "full" ]]; then
     container_name: neo-x
     restart: always
     # environment:
-      # NEO4J_AUTH: ${NEO4J_AUTH}
+      # NEO4J_AUTH: "\${NEO4J_AUTH}"
     networks:
       - xboson-net
 EOF
@@ -209,6 +283,7 @@ fi
   echo "Make 'docker-compose.yml' success."
   if ! docker compose config >/dev/null; then
     echo "got validating error, stop"
+    rm -f .env
     exit 1
   fi
 }
@@ -223,6 +298,14 @@ startup_app() {
   install_type_choose
   make_env
   make_compose 
+  if docker compose up; then
+    echo ""
+    docker ps
+    echo ""
+    echo "Install all sucess."
+  else
+    echo "got some error !"
+  fi
 }
 
 
@@ -236,30 +319,58 @@ show_help() {
   echo "  $name --license install"
 }
 
-backup() {
-  local target="$1"
 
-  # TODO
-  echo "backup: $target"
+backup_mysql() {
+  echo 1
 }
 
-restore() {
-  local target="$1"
-  local file="$2"
 
-  # TODO
-  echo "restore: $target $file"
+backup_web() {
+  echo 1
 }
+
+
+backup_mongo() {
+  echo 1
+}
+
+
+restore_mysql() {
+  local file="$1"
+}
+
+
+restore_web() {
+  local file="$1"
+}
+
+
+restore_mongo() {
+  local file="$1"
+}
+
 
 license_show() {
   # TODO
   echo "license show"
 }
 
+
 license_install() {
   # TODO
   echo "license install"
 }
+
+
+is_run() {
+  local container="$1"
+
+  if ! docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null | grep -q '^true$'; then
+    echo "Error: container '$container' is not running" >&2
+    exit 2
+  fi
+}
+
 
 parse_args() {
   if [[ $# -eq 0 ]]; then
@@ -274,18 +385,30 @@ parse_args() {
 
     --backup)
       if [[ $# -ne 2 ]]; then
-        echo "Error: --backup requires mysql, mongo or web" >&2
+        echo "Error: --backup requires mysql, mongo, web or all" >&2
         show_help
         return 1
       fi
 
       case "$2" in
-        mysql|mongo|web)
-          backup "$2"
+        mysql)
+          is_run mysql-x
+          backup_mysql
+          ;;
+        mongo)
+          backup_mongo
+          ;;
+        web)
+          backup_web
+          ;;
+        all)
+          backup_mysql
+          backup_web
+          backup_mongo
           ;;
         *)
           echo "Error: invalid backup target: $2" >&2
-          echo "Valid targets: mysql, mongo, web" >&2
+          echo "Valid targets: mysql, mongo, web, all" >&2
           return 1
           ;;
       esac
@@ -299,8 +422,14 @@ parse_args() {
       fi
 
       case "$2" in
-        mysql|mongo|web)
-          restore "$2" "$3"
+        mysql)
+          restore_mysql "$3"
+          ;;
+        mongo)
+          restore_mongo "$3"
+          ;;
+        web)
+          restore_web "$3"
           ;;
         *)
           echo "Error: invalid restore target: $2" >&2
@@ -340,8 +469,9 @@ parse_args() {
   esac
 }
 
+
 # ================================
 # Main
 # ================================
-
 parse_args "$@"
+
