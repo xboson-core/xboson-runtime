@@ -1,5 +1,6 @@
 #!/bin/bash
 INSTALL_MODE="mini"
+MY_MAIL=yanmingsohu@gmail.com
 
 check_compose() {
   if command -v yum >/dev/null 2>&1; then
@@ -289,6 +290,26 @@ fi
 }
 
 
+require_file() {
+  if [[ -f "$1" ]]; then
+    return
+  else
+    echo "File not found '$1'"
+    exit 4
+  fi
+}
+
+
+require_env() {
+  if [[ -f ".env" ]]; then
+    source .env
+  else
+    echo "Cannot load Environment variables from '.env'"
+    exit 3
+  fi
+}
+
+
 startup_app() {
   if [[ -f ".env" ]]; then
     echo "'.env' already exists, skip initialization."
@@ -314,51 +335,129 @@ show_help() {
   echo "Usage:"
   echo "  $name --help"
   echo "  $name --backup  <mysql|mongo|web>"
-  echo "  $name --restore <mysql|mongo|web> <file.tar.gz>"
+  echo "  $name --restore <mysql|mongo|web> <.sql|.db|.tar.gz>"
   echo "  $name --license show"
   echo "  $name --license install"
 }
 
 
 backup_mysql() {
-  echo 1
-}
-
-
-backup_web() {
-  echo 1
-}
-
-
-backup_mongo() {
-  echo 1
+  require_env
+  is_run $MYSQL_HOST
+  local file=mysql-backup-$(date '+%Y.%m.%d').sql
+  docker exec -i $MYSQL_HOST bash -c \
+    'mysqldump -uroot -p$MYSQL_ROOT_PASSWORD \
+      --host=127.0.0.1 --protocol=tcp --port=3306 \
+      --default-character-set=utf8 --skip-triggers --all-databases' \
+    > $file
+  if [ $? -eq 0 ];then 
+    echo "The backup is saved in file '$file'".
+    echo Done
+  else
+    echo Go some error, code: $?
+  fi
 }
 
 
 restore_mysql() {
+  require_env
+  is_run $MYSQL_HOST
   local file="$1"
+  require_file $file
+  docker exec -i $MYSQL_HOST bash -c \
+    'mysql -uroot -p${MYSQL_ROOT_PASSWORD}' \
+    < $file
+  if [ $? -eq 0 ];then 
+    echo Done
+  else
+    echo Go some error, code: $?
+  fi
+}
+
+
+backup_web() {
+  require_env
+  is_run xboson-rt
+  local file=web-backup-$(date '+%Y.%m.%d').tar.gz
+  docker exec -i xboson-rt bash -c \
+    'cd /web && tar -czp -f - *' > $file 
+  if [ $? -eq 0 ];then 
+    echo "The backup is saved in file '$file'".
+    echo Done
+  else
+    echo Go some error, code: $?
+  fi
 }
 
 
 restore_web() {
+  require_env
+  is_run xboson-rt
   local file="$1"
+  require_file $file
+  docker exec -i xboson-rt bash -c \
+    'cd /web && tar -xz -f -' < $file
+  if [ $? -eq 0 ];then 
+    echo Done
+  else
+    echo Go some error, code: $?
+  fi
+}
+
+
+backup_mongo() {
+  require_env
+  is_run $MONGO_HOST
+  local file=mongo-backup-$(date '+%Y.%m.%d').db
+  docker exec -i $MONGO_HOST bash -c \
+    'mongodump -h 127.0.0.1 --archive' > $file
+  if [ $? -eq 0 ];then 
+    echo "The backup is saved in file '$file'".
+    echo Done
+  else
+    echo Go some error, code: $?
+  fi
 }
 
 
 restore_mongo() {
+  require_env
+  is_run $MONGO_HOST
   local file="$1"
+  require_file $file
+  docker exec -i $MONGO_HOST bash -c \
+    'mongorestore --archive' < $file
+  if [ $? -eq 0 ];then 
+    echo Done
+  else
+    echo Go some error, code: $?
+  fi
 }
 
 
 license_show() {
-  # TODO
-  echo "license show"
+  require_env
+  docker cp xboson-rt:/root/xBoson-config/license.req .
+  echo 
+  echo ------------------------------------------------------------
+  cat license.req 
+  echo ------------------------------------------------------------
+  echo This is your authorization request file; 
+  echo please send it to $MY_MAIL.
+  echo 
 }
 
 
 license_install() {
-  # TODO
-  echo "license install"
+  require_env
+  if [[ -f "license.txt" ]]; then
+    if docker cp license.txt xboson-rt:/root/xBoson-config/; then
+      echo License file installed to xBoson-runtime.
+    fi
+  else
+    echo After you receive the license.txt file from $MY_MAIL,
+    echo "place the file here (`pwd`) and try again".
+  fi
 }
 
 
