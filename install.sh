@@ -135,8 +135,9 @@ EOF
 
 
 make_compose() {
-  local ipf="" # local test
-  # local ipf="xbosoncore/" # on dockerhub
+  # local ipf="" # local test
+  local ipf="xbosoncore/" # on dockerhub
+
   cat > ./docker-compose.yml <<EOF
 networks:
   xboson-net:
@@ -319,11 +320,11 @@ startup_app() {
   install_type_choose
   make_env
   make_compose 
-  if docker compose up; then
+  if docker compose up -d; then
     echo ""
     docker ps
     echo ""
-    echo "Install all sucess."
+    echo "Install done."
   else
     echo "got some error !"
   fi
