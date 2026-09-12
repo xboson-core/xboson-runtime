@@ -1,48 +1,100 @@
-# 该指南讲解 install.sh 的其他功能
+# Additional `install.sh` Features
 
-为了方便, 你可以把 `https://raw.githubusercontent.com/xboson-core/xboson-runtime/refs/heads/main/install.sh` 这个脚本下载到一个空文件甲中.
+This guide explains the additional features provided by `install.sh`.
 
+For convenience, you can download the script to an empty directory:
 
-## 默认行为
+```bash
+curl -fsSL https://raw.githubusercontent.com/xboson-core/xboson-runtime/refs/heads/main/install.sh -o install.sh
+```
 
-该脚本会执行拉起镜像并启动一个单节点服务, 立即可用和授予免费不现时评估授权.
-该脚本不能再已经安装的目录中再次安装, 这会覆盖保存密码的文件, 脚本会报错退出.
-所有的密码和上下文配置保存在 .env 文件中, 
-生成的 docker-compose.yml 用于 docker compose 命令进行管理.
-`install.sh --help` 查看可用命令,
+## Default Behavior
 
-> 没有将容器中的数据卷导出, 如果你删除了 mysql 容器, 则所有数据都会丢失
+By default, the script:
 
-一下功能只支持用 `install.sh` 创建的容器
+* Pulls the required Docker images.
+* Starts a single-node xBoson service.
+* Makes the service immediately available.
+* Provides a free license with limited features.
 
+The script **cannot be run again in an existing installation directory**. This is intentional because reinstalling could overwrite files containing saved passwords. The script will detect the existing installation and exit with an error.
 
-## 数据备份
+All passwords and other runtime configuration are stored in the `.env` file.
 
-备份web文件:
-`install.sh --backup web`
-备份mysql
-`install.sh --backup mysql`
-备份mongodb
-`install.sh --backup mongo`
+The generated `docker-compose.yml` file is used to manage the services with Docker Compose.
 
+Run the following command to see all available commands:
 
-## 数据恢复
+```bash
+install.sh --help
+```
 
-> 注意: 这有会覆盖当前数据, 恢复前应该备份
+> **Warning:** Container data volumes are not exported or backed up automatically. If you remove the MySQL container and its associated volume, all MySQL data will be lost.
 
-恢复 web 文件:
-`install.sh --restore web web.tar.gz`
-恢复 mysql 数据
-`install.sh --restore mysql data.sql`
-恢复 mongodb 数据
-`install.sh --restore mongo data.db`
+The features described below are supported only for containers created by `install.sh`.
 
-## 授权许可
+## Data Backup
 
-1. 执行 `install.sh --license show` 会看到授权请求文件内容.
-2. 将文件内容复制到邮件中, 发送给 `yanmingsohu@gmail.com`.
-3. 您会收到邮件答复包含 `license.txt` 的附件
-4. 将 `license.txt` 复制到 `install.sh` 所在目录
-5. 执行 `install.sh --license install` 授权即被安装
+### Back up Web Files
 
-[About authorization](./authorization.md)
+```bash
+install.sh --backup web
+```
+
+### Back up MySQL
+
+```bash
+install.sh --backup mysql
+```
+
+### Back up MongoDB
+
+```bash
+install.sh --backup mongo
+```
+
+## Data Restore
+
+> **Warning:** Restoring data will overwrite the current data. Always create a backup before performing a restore.
+
+### Restore Web Files
+
+```bash
+install.sh --restore web web.tar.gz
+```
+
+### Restore MySQL Data
+
+```bash
+install.sh --restore mysql data.sql
+```
+
+### Restore MongoDB Data
+
+```bash
+install.sh --restore mongo data.db
+```
+
+## License Authorization
+
+To request and install an authorization license:
+
+1. Run the following command to display the license request information:
+
+   ```bash
+   install.sh --license show
+   ```
+
+2. Copy the displayed content into an email and send it to `yanmingsohu@gmail.com`.
+
+3. You will receive a reply containing a `license.txt` attachment.
+
+4. Copy `license.txt` to the same directory as `install.sh`.
+
+5. Install the license by running:
+
+   ```bash
+   install.sh --license install
+   ```
+
+For more information, see [About Authorization](./authorization.md).
