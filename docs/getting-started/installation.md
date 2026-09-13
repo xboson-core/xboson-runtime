@@ -25,6 +25,9 @@ Wait for the installation to complete.
 
 If the script finishes without errors, xBoson should be running.
 
+[Advanced Installation Guide](./adv_install.md)
+
+
 ## Open xBoson
 
 Open the following URL in your browser:
@@ -34,6 +37,7 @@ http://server-host:8080/xboson
 ```
 
 Replace `server-host` with the hostname or IP address of your server.
+
 
 ### Default Login
 

@@ -24,6 +24,7 @@ Quickly install a working system.
 
 - [What is xBoson?](./docs/getting-started/what-is.md)
 - [Installation](./docs/getting-started/installation.md)
+- [Advanced Installation Guide](./docs/getting-started/adv_install.md)
 - [Architecture](./docs/getting-started/architecture.md)
 - API-IDE
 
