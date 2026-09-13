@@ -2,6 +2,12 @@
 INSTALL_MODE="mini"
 MY_MAIL=yanmingsohu@gmail.com
 
+# export XBOSON_LOCAL_DEBUG=true
+if [[ XBOSON_LOCAL_DEBUG == "" ]]; then
+  xboson_image_predix=xbosoncore/
+  xboson_compose_opt=-d
+fi
+
 check_compose() {
   if command -v yum >/dev/null 2>&1; then
     pksys="yum"
@@ -135,9 +141,7 @@ EOF
 
 
 make_compose() {
-  # local ipf="" # local test
-  local ipf="xbosoncore/" # on dockerhub
-
+  local ipf=$xboson_image_predix
   cat > ./docker-compose.yml <<EOF
 networks:
   xboson-net:
@@ -320,7 +324,7 @@ startup_app() {
   install_type_choose
   make_env
   make_compose 
-  if docker compose up -d; then
+  if docker compose up $xboson_compose_opt; then
     echo ""
     docker ps
     echo ""
@@ -335,6 +339,7 @@ show_help() {
   local name=`basename $0`
   echo "Usage:"
   echo "  $name --help"
+  echo "  $name <No parameters>"
   echo "  $name --backup  <mysql|mongo|web>"
   echo "  $name --restore <mysql|mongo|web> <.sql|.db|.tar.gz>"
   echo "  $name --license show"
