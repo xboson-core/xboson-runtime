@@ -1,6 +1,13 @@
 # xBoson
 
-Java-based runtime for online JavaScript API and UI development.
+High-performance microservices PaaS.  
+Develop microservices online; the core can be embedded into J2EE containers, 
+with real-time online compilation for Vue/React.js/Typescript.
+Multi-threaded JavaScript execution, a comprehensive security/authorization system, 
+and AI-context friendliness.
+
+The frontend is fully open-source, and the backend services are also open-source; 
+you can view the entire source code by installing the Docker container.
 
 [Architecture diagram](./docs/getting-started/architecture.md)
 
